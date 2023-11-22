@@ -1,0 +1,99 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Processamento de Imagem</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500&display=swap" rel="stylesheet">
+
+    <script src="https://code.jquery.com/jquery-3.6.4.js"></script>
+    <script src="menu.js"></script>
+    <style>
+        *{
+            font-family: 'Poppins', sans-serif;
+        }
+        header{
+            font-size:28px;
+            height: 70px;
+        }
+        ul{
+            list-style: none;
+        }
+        .menu{
+            color: rgb(124, 77, 143);
+        }
+        .menu:hover{
+            color: rgb(86, 28, 109);
+            cursor: pointer;
+        }
+        .nome1{
+            color: white;
+        }
+        .nome2{
+            color: rgb(95, 13, 128);
+        }
+        .btn-custom{
+            padding: 12px 20px;
+        }
+        img{
+            max-width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    
+    <header class="bg-dark d-flex align-items-center">
+        <div class="container-fluid ">
+            <div class="d-flex align-item-center justify-content-between">
+                <a class="text-decoration-none" href=""><span class="nome1">Trabalho</span> <span class="nome2">de PAI</span></a>
+                <ul class="d-flex gap-4 align-items-center m-0 ">
+                    <li><a id="click-gray" class="text-decoration-none menu">Transform Gray</a></li>
+                    <li><a id="click-chroma" class="text-decoration-none menu">Chroma Key</a></li>
+                    <li><a id="click-limiarizacao" class="text-decoration-none menu"> Limiarização</a></li>
+                </ul>
+            </div>
+        </div>
+    </header>
+    <div class="tom-cinza">
+        <div class="d-flex flex-column align-items-center justify-content-center ">
+            <h1>Imagem em tom de cinza</h1>
+            <label class="btn btn-primary btn-custom" for="inputImagem-gray">Envie sua Imagem</label>
+            <input class="d-none" type="file" name="inputImagem-gray" id="inputImagem-gray" accept="image/*">
+        </div>
+    </div>
+
+
+    <div class="chroma-key"> 
+        <div class="d-flex flex-column align-items-center justify-content-center ">
+            <h1>Chroma Key</h1>
+            <label class="btn btn-primary btn-custom" for="inputImagem-chroma">Envie sua Imagem</label>
+            <input class="d-none" type="file" name="inputImagem-chroma" id="inputImagem-chroma" accept="image/*">
+        </div>
+    </div>
+
+    <div class="limiarizacao">
+        <div class="d-flex flex-column align-items-center justify-content-center">
+            <h1>Limiarização</h1>
+            <label class="btn btn-primary btn-custom" for="inputImagem-limiarizacao">Envie sua Imagem</label>
+            <input class="d-none" type="file" name="inputImagem-limiarizacao" id="inputImagem-limiarizacao" accept="image/*"> 
+        </div>
+    </div>
+
+    
+    <div class="row mt-3 mx-2" id="resultado"></div>
+    
+   
+
+
+
+    
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+    <script src="script.js"></script>
+</body>
+</html>
