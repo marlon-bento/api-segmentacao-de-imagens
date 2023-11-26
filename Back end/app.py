@@ -5,8 +5,8 @@
 
 
 from scipy.ndimage import label, generate_binary_structure
-from flask import Flask, request, jsonify
-from flask_cors import CORS
+from flask import Flask, request, jsonify, render_template
+#from flask_cors import CORS
 import cv2
 import numpy as np
 import base64
@@ -14,7 +14,12 @@ from matplotlib import pyplot as plt
 
 
 app = Flask(__name__)
-CORS(app)# Adicione esta linha para habilitar CORS
+#CORS(app)# Adicione esta linha para habilitar CORS
+
+
+@app.route('/', methods=['GET'])
+def index(name=None):
+    return render_template('index.html', name=name)
 
 @app.route('/color_gray', methods=['POST'])
 def gray():
