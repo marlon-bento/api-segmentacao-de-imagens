@@ -55,6 +55,7 @@
                     <li><a id="click-gray" class="text-decoration-none menu">Transform Gray</a></li>
                     <li><a id="click-chroma" class="text-decoration-none menu">Chroma Key</a></li>
                     <li><a id="click-limiarizacao" class="text-decoration-none menu"> Limiarização</a></li>
+                    <li><a id="click-sobel" class="text-decoration-none menu"> sobel</a></li>
                 </ul>
             </div>
         </div>
@@ -84,8 +85,17 @@
         </div>
     </div>
 
+    <div class="sobel">
+        <div class="d-flex flex-column align-items-center justify-content-center">
+            <h1>sobel</h1>
+            <label class="btn btn-primary btn-custom" for="inputImagem-sobel">Envie sua Imagem</label>
+            <input class="d-none" type="file" name="inputImagem-sobel" id="inputImagem-sobel" accept="image/*"> 
+        </div>
+    </div>
+
+    <div class="row mt-3 mx-2 justify-content-center" id="processamento"></div>
     
-    <div class="row mt-3 mx-2" id="resultado"></div>
+    <div class="row mt-3 mx-2 justify-content-center" id="resultado"></div>
     
    
 
