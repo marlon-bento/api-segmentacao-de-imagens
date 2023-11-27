@@ -60,6 +60,26 @@
             </div>
         </div>
     </header>
+
+    <div class="form-enviar">
+        <div class="d-flex flex-column align-items-center justify-content-center ">
+            <h1>Vamos processar a sua imagem!</h1>
+            <form action="#" id="theForm">
+                <label for="inputImagem">Imagem: </label>
+                <input type="file" name="inputImagem" id="inputImagem" accept="image/*" /> <br>
+                <label for="inputImagem">Fundo: </label>
+                <input type="file" name="inputFundo" id="inputFundo" accept="image/*" /> <br>
+                <select name="op" id="inputOp">
+                    <option value="0">Escala Cinza</option>
+                    <option value="1">Chroma Key</option>
+                    <option value="2">Limiarização</option>
+                    <option value="3">Sobel</option>
+                </select>
+                <input type="submit" class="btn btn-primary btn-custom" value="Enviar" />
+            </form>
+        </div>
+    </div>
+
     <div class="tom-cinza">
         <div class="d-flex flex-column align-items-center justify-content-center ">
             <h1>Imagem em tom de cinza</h1>

@@ -1,4 +1,51 @@
 // script.js
+$('#theForm').submit((e) => {
+    e.preventDefault();
+    var inputImagem = $('#inputImagem')[0].files[0]; //Imagem alvo
+    var inputFundo = $('#inputFundo')[0].files[0]; //Imagem fundo
+    var op = $('#inputOp')[0].value;  // Operacao
+    console.log('A operação é: ', op);
+    var reader = new FileReader(); // Converte imagem para envio como json (mudar depois)
+    reader.onload = function (e) {
+        var dadosImagem = e.target.result.split(',')[1];
+
+        // Exibir mensagem de carregamento
+        document.getElementById('resultado').innerHTML = 'Processando imagem...';
+
+        // Enviar imagem para a API
+        $.ajax({
+            url: 'http://127.0.0.1:5000/color_gray',
+            type: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ 'imagem': dadosImagem }),
+            success: function (data) {
+                document.getElementById('resultado').innerHTML = "<h1>Etapas de Processamento da imagem:</h1>"
+                // Exibir imagem original
+                document.getElementById('resultado').innerHTML +=` 
+                <div class="col text-center">          
+                    <img src="data:image/png;base64, ${data.imagem_original}" alt="">
+                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem original</h1>
+                </div>`
+                // Exibir imagem processada (preto e branco)
+                document.getElementById('resultado').innerHTML += ` 
+                <div class="col text-center">          
+                    <img src="data:image/png;base64, ${data.imagem_pb}" alt="">
+                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem preto e branco</h1>
+                </div>`
+                
+            },
+            error: function (error) {
+                console.log('Erro ao processar imagem:', error);
+                document.getElementById('resultado').innerHTML = 'Erro ao processar imagem.';
+            }
+        });
+        
+    };
+
+    reader.readAsDataURL(inputImagem);
+    // Limpar o valor do campo de entrada de imagem
+    //inputImagem.value = null; // Use null para garantir a limpeza em diferentes navegadores
+});
  // Adicione um ouvinte de evento para o input de imagem
  document.getElementById('inputImagem-gray').addEventListener('change', function() {
     var inputImagem = document.getElementById('inputImagem-gray');
