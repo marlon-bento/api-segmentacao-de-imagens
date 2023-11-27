@@ -40,54 +40,34 @@
             padding: 12px 20px;
         }
         img{
-            max-width: 100%;
+            width: 100%;
+            
+            max-width: 600px;
         }
     </style>
 </head>
 <body>
-
+    
     
     <header class="bg-dark d-flex align-items-center">
         <div class="container-fluid ">
             <div class="d-flex align-item-center justify-content-between">
                 <a class="text-decoration-none" href=""><span class="nome1">Trabalho</span> <span class="nome2">de PAI</span></a>
                 <ul class="d-flex gap-4 align-items-center m-0 ">
-                    <li><a id="click-gray" class="text-decoration-none menu">Transform Gray</a></li>
-                    <li><a id="click-chroma" class="text-decoration-none menu">Chroma Key</a></li>
-                    <li><a id="click-limiarizacao" class="text-decoration-none menu"> Limiarização</a></li>
-                    <li><a id="click-sobel" class="text-decoration-none menu"> sobel</a></li>
+                    <li><a id="click-sobel" class="text-decoration-none menu">Retirar fundo</a></li>
                 </ul>
             </div>
         </div>
     </header>
-    <div class="tom-cinza">
-        <div class="d-flex flex-column align-items-center justify-content-center ">
-            <h1>Imagem em tom de cinza</h1>
-            <label class="btn btn-primary btn-custom" for="inputImagem-gray">Envie sua Imagem</label>
-            <input class="d-none" type="file" name="inputImagem-gray" id="inputImagem-gray" accept="image/*">
-        </div>
-    </div>
 
-
-    <div class="chroma-key"> 
-        <div class="d-flex flex-column align-items-center justify-content-center ">
-            <h1>Chroma Key</h1>
-            <label class="btn btn-primary btn-custom" for="inputImagem-chroma">Envie sua Imagem</label>
-            <input class="d-none" type="file" name="inputImagem-chroma" id="inputImagem-chroma" accept="image/*">
-        </div>
-    </div>
-
-    <div class="limiarizacao">
-        <div class="d-flex flex-column align-items-center justify-content-center">
-            <h1>Limiarização</h1>
-            <label class="btn btn-primary btn-custom" for="inputImagem-limiarizacao">Envie sua Imagem</label>
-            <input class="d-none" type="file" name="inputImagem-limiarizacao" id="inputImagem-limiarizacao" accept="image/*"> 
-        </div>
+    <div class="d-flex justify-content-between m-3">
+        <h1>Retirar fundo:</h1>
+        <button class="btn btn-primary" onclick="limparTudo()">Limpar Tudo</button>
     </div>
 
     <div class="sobel">
         <div class="d-flex flex-column align-items-center justify-content-center">
-            <h1>sobel</h1>
+            
             <label class="btn btn-primary btn-custom" for="inputImagem-sobel">Envie sua Imagem</label>
             <input class="d-none" type="file" name="inputImagem-sobel" id="inputImagem-sobel" accept="image/*"> 
         </div>
@@ -95,10 +75,10 @@
 
     <div class="row mt-3 mx-2 justify-content-center" id="processamento"></div>
     
-    <div class="row mt-3 mx-2 justify-content-center" id="resultado"></div>
+    <div class="d-flex flex-column justify-content-center align-items-center" id="resultado"></div>
     
    
-
+    
 
 
     
