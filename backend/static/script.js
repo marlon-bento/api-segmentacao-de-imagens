@@ -1,11 +1,43 @@
 // script.js
+const ENDPOINT = "http://127.0.0.1:5000/";
+
 $('#theForm').submit((e) => {
     e.preventDefault();
     var inputImagem = $('#inputImagem')[0].files[0]; //Imagem alvo
     var inputFundo = $('#inputFundo')[0].files[0]; //Imagem fundo
+    var formData = new FormData($('#theForm')[0]);
     var op = $('#inputOp')[0].value;  // Operacao
     console.log('A operação é: ', op);
-    var reader = new FileReader(); // Converte imagem para envio como json (mudar depois)
+
+    $.ajax({
+        type: "POST",
+        url: ENDPOINT + "processar",
+        data: formData,
+        contentType: false,
+        processData: false,
+        success: function (data) {
+            document.getElementById('resultado').innerHTML = "<h1>Etapas de Processamento da imagem:</h1>"
+            // Exibir imagem original
+            document.getElementById('resultado').innerHTML +=` 
+            <div class="col text-center">          
+                <img src="data:image/png;base64, ${data.imagem_original}" alt="">
+                <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem original</h1>
+            </div>`
+            // Exibir imagem processada
+            document.getElementById('resultado').innerHTML += ` 
+            <div class="col text-center">          
+                <img src="data:image/png;base64, ${data.imagem_pb}" alt="">
+                <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem processada</h1>
+            </div>`
+            
+        },
+        error: function (xhr,status,error) {
+            console.log('Erro ao processar imagem:', xhr.responseJSON);
+            document.getElementById('resultado').innerHTML = 'Erro ao processar imagem.';
+        }
+    });
+
+    /*var reader = new FileReader(); // Converte imagem para envio como json (mudar depois)
     reader.onload = function (e) {
         var dadosImagem = e.target.result.split(',')[1];
 
@@ -42,7 +74,7 @@ $('#theForm').submit((e) => {
         
     };
 
-    reader.readAsDataURL(inputImagem);
+    reader.readAsDataURL(inputImagem);*/
     // Limpar o valor do campo de entrada de imagem
     //inputImagem.value = null; // Use null para garantir a limpeza em diferentes navegadores
 });

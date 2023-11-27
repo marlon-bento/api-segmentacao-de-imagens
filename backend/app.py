@@ -12,38 +12,72 @@ import numpy as np
 import base64
 from matplotlib import pyplot as plt
 
+import tempfile
+import os
 
 app = Flask(__name__)
 #CORS(app)# Adicione esta linha para habilitar CORS
+#Essa constante guarda a pasta onde estarao as imagens temporariamente
+TEMP_FOLDER = os.path.join(app.root_path, 'temporarios')
+os.makedirs(TEMP_FOLDER, exist_ok=True)
 
 
 @app.route('/', methods=['GET'])
 def index(name=None):
     return render_template('index.html', name=name)
 
-@app.route('/color_gray', methods=['POST'])
-def gray():
+@app.route('/processar', methods=['POST'])
+def processar():
     try:
-        # Obter a imagem a partir dos dados POST
-        dados_imagem = request.json['imagem']
-        imagem_decodificada = base64.b64decode(dados_imagem)
-        imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
-        imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
+        #Obtem a imagem direto do request
+        dados_imagem = request.files['inputImagem']
+        dados_fundo = request.files['inputFundo']
 
+        #Obtem a operacao direto do request
+        op = request.form['op']
 
+        #Caminho do arquivo temporario que representa a imagem e nao sera deletado quando fechado
+        caminho = tempfile.NamedTemporaryFile(delete=False,dir=TEMP_FOLDER).name
+        caminho_fundo = tempfile.NamedTemporaryFile(delete=False, dir=TEMP_FOLDER).name
 
+        #Salva
+        dados_imagem.save(caminho)
+        dados_fundo.save(caminho_fundo)
 
+        #A imagem eh lida pelo cv
+        imagem = cv2.imread(caminho)
 
-        # Processar a imagem (converter para preto e branco)
-        imagem_pb = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        # Faz o parse do OP para inteiro
+        try:
+            op = int(op)
+        except ValueError:
+            return jsonify({'error':'Erro de conversao de op'})
 
-        # Codificar ambas as imagens para base64
+        # Processar a imagem  de acordo com a OP, retorna apenas o resultado final
+        if op == 0:
+            imagem_pb = gray(imagem)
+        elif op == 1:
+            print("Iniciando a limiarizacao")
+            imagem_pb = limiarizacao(imagem)
+        elif op == 2:
+            print("Iniciando o Sobel")
+            imagem_pb = sobel(imagem)
+        else:
+            print("Nada foi selecionado entao gray")
+            imagem_pb = gray(imagem)
+        
+
+        #Por enquanto fazer retornar como JSON:
         _, imagem_original_codificada = cv2.imencode('.png', imagem)
         _, imagem_pb_codificada = cv2.imencode('.png', imagem_pb )  # Adicione o _
 
         imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
         imagem_pb_base64 = base64.b64encode(imagem_pb_codificada).decode('utf-8')
 
+        # Deleta o caminho temporario e a imagem temporaria (por algum motivo comportamento estranho verificar depois)
+        os.remove(caminho)
+        os.remove(caminho_fundo)
+
         # Retornar ambas as imagens processadas
         return jsonify({
             'imagem_original': imagem_original_base64,
@@ -52,35 +86,39 @@ def gray():
 
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
-    
-@app.route('/processar_imagem', methods=['POST'])
-def processar_imagem():
+
+def gray(imagem):
     try:
         # Obter a imagem a partir dos dados POST
-        dados_imagem = request.json['imagem']
-        imagem_decodificada = base64.b64decode(dados_imagem)
-        imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
-        imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
-        
+        #dados_imagem = request.json['imagem']
+        #imagem_decodificada = base64.b64decode(dados_imagem)
+        #imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
+        #imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
+
+
+
+
+
         # Processar a imagem (converter para preto e branco)
-        imagem_pb = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        imagemR = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
 
         # Codificar ambas as imagens para base64
-        _, imagem_original_codificada = cv2.imencode('.png', imagem)
-        _, imagem_pb_codificada = cv2.imencode('.png', imagem_pb)  # Adicione o _
+        #_, imagem_original_codificada = cv2.imencode('.png', imagem)
+        #_, imagem_pb_codificada = cv2.imencode('.png', imagem_pb )  # Adicione o _
 
-        imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
-        imagem_pb_base64 = base64.b64encode(imagem_pb_codificada).decode('utf-8')
+        #imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
+        #imagem_pb_base64 = base64.b64encode(imagem_pb_codificada).decode('utf-8')
 
         # Retornar ambas as imagens processadas
-        return jsonify({
-            'imagem_original': imagem_original_base64,
-            'imagem_pb': imagem_pb_base64
-        })
-
+        #return jsonify({
+        #    'imagem_original': imagem_original_base64,
+        #    'imagem_pb': imagem_pb_base64
+        #})
+        return imagemR
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500
-
+        #return jsonify({'erro': str(e)}), 500
+        print("Erro na Grayscalizacao: " + str(e))
+        return imagem
 
 
 def downscale_image(image, scale_factor):
@@ -113,23 +151,22 @@ def preencher_vizinhanca(imagem, tamanho_vizinhanca):
     return imagem_conectada
 
 
-@app.route('/limiarizacao', methods=['POST'])
-def limiarizacao():
+def limiarizacao(imagem):
     try:
-        # Obter a imagem a partir dos dados POST
-        dados_imagem = request.json['imagem']
-        imagem_decodificada = base64.b64decode(dados_imagem)
-        imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
-        imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
+        # Obter a imagem a partir dos dados POST ----- ja veio direto do outro
+        #dados_imagem = request.json['imagem']
+        #imagem_decodificada = base64.b64decode(dados_imagem)
+        #imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
+        #imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
         
         # Reduzir a qualidade para acelerar o processamento
-        imagem = downscale_image(imagem, scale_factor=0.4)
+        imagemT = downscale_image(imagem, scale_factor=0.4)
 
 
 
 
         # Processar a imagem (converter para preto e branco)
-        img_gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+        img_gray = cv2.cvtColor(imagemT, cv2.COLOR_BGR2GRAY)
 
         desfoque = cv2.GaussianBlur(img_gray,(7,7),0) #suavização
         equ = cv2.equalizeHist(desfoque) #equalização
@@ -198,53 +235,45 @@ def limiarizacao():
         
         
  
-        # Aplicar a máscara na imagem original
-        result = cv2.bitwise_and(imagem, imagem, mask=mascara)
+        # Aplicar a máscara na imagem original (alterei para imagemT depois revisar porfavor)
+        result = cv2.bitwise_and(imagemT, imagemT, mask=mascara)
         #aumentando a qualidade novamente da imagem
         result = upscale_image(result, scale_factor=0.2)
-        # Converta a imagem resultante para base64
-        _, result_codificada = cv2.imencode('.png', result)
-        resultado_base64 = base64.b64encode(result_codificada).decode('utf-8')
+        
+        
+        # Converta a imagem resultante para base64  ------ nao eh mais necessario
+        #_, result_codificada = cv2.imencode('.png', result)
+        #resultado_base64 = base64.b64encode(result_codificada).decode('utf-8')
 
+        #_, imagem_original_codificada = cv2.imencode('.png', imagem)
+        #_, img_gray_codificada = cv2.imencode('.png', mascara)  # Adicione o _
+        #_, imagem_thresh_codificada = cv2.imencode('.png', thresh)
 
-
-
-
-
-
-
-
-
-
-
-
-        _, imagem_original_codificada = cv2.imencode('.png', imagem)
-        _, img_gray_codificada = cv2.imencode('.png', mascara)  # Adicione o _
-        _, imagem_thresh_codificada = cv2.imencode('.png', thresh)
-
-        imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
-        img_gray_base64 = base64.b64encode(img_gray_codificada).decode('utf-8')
-        imagem_thresh_base64 = base64.b64encode(imagem_thresh_codificada).decode('utf-8')
+        #imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
+        #img_gray_base64 = base64.b64encode(img_gray_codificada).decode('utf-8')
+        #imagem_thresh_base64 = base64.b64encode(imagem_thresh_codificada).decode('utf-8')
 
         # Retornar ambas as imagens processadas
-        return jsonify({
-            'imagem_original': imagem_original_base64,
-            'imagem_pb': img_gray_base64,
-            'imagem_thresh': resultado_base64
-        })
+        #return jsonify({
+        #    'imagem_original': imagem_original_base64,
+        #    'imagem_pb': img_gray_base64,
+        #    'imagem_thresh': resultado_base64
+        #})
+        return result
 
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500
+        #return jsonify({'erro': str(e)}), 500
+        print("Erro na Limiarizacao: " + str(e))
+        return imagem
     
 
-@app.route('/sobel', methods=['POST'])
-def sobel():
+def sobel(imagem):
     try:
         # Obter a imagem a partir dos dados POST
-        dados_imagem = request.json['imagem']
-        imagem_decodificada = base64.b64decode(dados_imagem)
-        imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
-        imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
+        #dados_imagem = request.json['imagem']
+        #imagem_decodificada = base64.b64decode(dados_imagem)
+        #imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
+        #imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
 
 
         img_gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
@@ -294,47 +323,40 @@ def sobel():
         # Aplicar a máscara na imagem original
         result = cv2.bitwise_and(imagem, imagem, mask=mascara)
 
-        # Converta a imagem resultante para base64
-        _, result_codificada = cv2.imencode('.png', result)
-        resultado_base64 = base64.b64encode(result_codificada).decode('utf-8')
+        # Converta a imagem resultante para base64 -------- nao eh mais necessario
+        #_, result_codificada = cv2.imencode('.png', result)
+        #resultado_base64 = base64.b64encode(result_codificada).decode('utf-8')
 
+        #_, imagem_original_codificada = cv2.imencode('.png', mascara)
+        #_, img_gray_codificada = cv2.imencode('.png', sobel_x)  # Adicione o _
+        #_, imagem_thresh_codificada = cv2.imencode('.png', sobel_y)
+        #_, img_sobelx_codificada = cv2.imencode('.png', sobel_x)
+        #_, img_sobely_codificada = cv2.imencode('.png', sobel_y)
+        #_, img_sobelxy_codificada = cv2.imencode('.png', sobel)
+        #_, img_resultado_codificada = cv2.imencode('.png', sobel_y)
 
-
-
-
-
-
-
-
-
-        _, imagem_original_codificada = cv2.imencode('.png', mascara)
-        _, img_gray_codificada = cv2.imencode('.png', sobel_x)  # Adicione o _
-        _, imagem_thresh_codificada = cv2.imencode('.png', sobel_y)
-        _, img_sobelx_codificada = cv2.imencode('.png', sobel_x)
-        _, img_sobely_codificada = cv2.imencode('.png', sobel_y)
-        _, img_sobelxy_codificada = cv2.imencode('.png', sobel)
-        _, img_resultado_codificada = cv2.imencode('.png', sobel_y)
-
-        imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
-        img_gray_base64 = base64.b64encode(img_gray_codificada).decode('utf-8')
-        imagem_thresh_base64 = base64.b64encode(imagem_thresh_codificada).decode('utf-8')
-        imagem_sobelx_base64 = base64.b64encode(img_sobelx_codificada).decode('utf-8')
-        imagem_sobely_base64 = base64.b64encode(img_sobely_codificada).decode('utf-8')
-        imagem_sobelxy_base64 = base64.b64encode(img_sobelxy_codificada).decode('utf-8')
-        imagem_resultado_base64 = base64.b64encode(img_resultado_codificada).decode('utf-8')
+        #imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
+        #img_gray_base64 = base64.b64encode(img_gray_codificada).decode('utf-8')
+        #imagem_thresh_base64 = base64.b64encode(imagem_thresh_codificada).decode('utf-8')
+        #imagem_sobelx_base64 = base64.b64encode(img_sobelx_codificada).decode('utf-8')
+        #imagem_sobely_base64 = base64.b64encode(img_sobely_codificada).decode('utf-8')
+        #imagem_sobelxy_base64 = base64.b64encode(img_sobelxy_codificada).decode('utf-8')
+        #imagem_resultado_base64 = base64.b64encode(img_resultado_codificada).decode('utf-8')
 
         # Retornar ambas as imagens processadas
-        return jsonify({
-            'imagem_original': imagem_original_base64,
-            'imagem_sobel_x': imagem_sobelx_base64,
-            'imagem_sobel_y': imagem_sobely_base64,
-            'imagem_soma_xy': imagem_sobelxy_base64,
-            'resultado': resultado_base64
-
-        })
+        #return jsonify({
+        #    'imagem_original': imagem_original_base64,
+        #    'imagem_sobel_x': imagem_sobelx_base64,
+        #    'imagem_sobel_y': imagem_sobely_base64,
+        #    'imagem_soma_xy': imagem_sobelxy_base64,
+        #    'resultado': resultado_base64
+        #})
+        return result
 
     except Exception as e:
-        return jsonify({'erro': str(e)}), 500    
+        #return jsonify({'erro': str(e)}), 500 
+        print("Erro na Sobelizacao: " + str(e))   
+        return imagem
 
 if __name__ == '__main__':
     app.run(debug=True)
