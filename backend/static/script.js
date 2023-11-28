@@ -1,14 +1,20 @@
 // script.js
-const ENDPOINT = "http://127.0.0.1:5000/";
+const ENDPOINT = "http://127.0.0.1:5000/"; // Endpoint da API
 
 $('#theForm').submit((e) => {
     e.preventDefault();
+    $("#resultado").empty(); // limpa o conteúdo da div
+    $("#processamento").empty();
     var inputImagem = $('#inputImagem')[0].files[0]; //Imagem alvo
     var inputFundo = $('#inputFundo')[0].files[0]; //Imagem fundo
     var formData = new FormData($('#theForm')[0]);
-    var op = $('#inputOp')[0].value;  // Operacao
-    console.log('A operação é: ', op);
 
+    // Mensagem de processamento
+    $('#processamento').innerHTML = 'Processando a imagem...';
+    $('#resultado').innerHTML = '';
+
+
+    // Requisicao AJAX pelo jQuery
     $.ajax({
         type: "POST",
         url: ENDPOINT + "processar",
@@ -16,242 +22,92 @@ $('#theForm').submit((e) => {
         contentType: false,
         processData: false,
         success: function (data) {
-            document.getElementById('resultado').innerHTML = "<h1>Etapas de Processamento da imagem:</h1>"
+            // Recebe o JSON resposta da API caso sucesso
+            document.getElementById('resultado').innerHTML = "<h1>Resultado:</h1>";
             // Exibir imagem original
             document.getElementById('resultado').innerHTML +=` 
             <div class="col text-center">          
                 <img src="data:image/png;base64, ${data.imagem_original}" alt="">
-                <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem original</h1>
-            </div>`
+                <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Original</h1>
+            </div>`;
+            // Exibir imagem em escala de cinza
+            document.getElementById('processamento').innerHTML += ` 
+                <div class="col text-center">          
+                    <img src="data:image/png;base64, ${data.imagem_gray}" alt="">
+                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Cinza</h1>
+                </div>`;
+            // Exibir imagem canny
+            document.getElementById('processamento').innerHTML +=  ` 
+                <div class="col text-center">          
+                    <img src="data:image/png;base64, ${data.imagem_canny}" alt="">
+                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Segmentação Canny</h1>
+                </div>`;
+            // Exibir imagem limiarizada
+            document.getElementById('processamento').innerHTML +=  ` 
+                <div class="col text-center">          
+                    <img src="data:image/png;base64, ${data.imagem_limiarizacao}" alt="">
+                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Segmentação Limiarização</h1>
+                </div>`;
+            // Exibir imagem sobelizada
+            document.getElementById('processamento').innerHTML +=  ` 
+                <div class="col text-center">          
+                    <img src="data:image/png;base64, ${data.imagem_sobel}" alt="">
+                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Segmentação Sobel x|y</h1>
+                </div>`;
+            // Exibir imagem somada
+            document.getElementById('processamento').innerHTML +=  ` 
+                <div class="col text-center">          
+                    <img src="data:image/png;base64, ${data.imagem_soma}" alt="">
+                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Soma das Operações</h1>
+                </div>`;
+            // Perfumaria
+            //document.getElementById('resultado').innerHTML = "<h1>Resultado final:</h1>";
             // Exibir imagem processada
             document.getElementById('resultado').innerHTML += ` 
             <div class="col text-center">          
-                <img src="data:image/png;base64, ${data.imagem_pb}" alt="">
-                <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem processada</h1>
-            </div>`
+                <img src="data:image/png;base64, ${data.imagem_semfundo}" alt="">
+                <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Sem Background</h1>
+            </div>`;
+            // Exibir imagem com o fundo
+            document.getElementById('resultado').innerHTML += ` 
+            <div class="col text-center">          
+                <img id="minhaImagem" src="data:image/png;base64, ${data.resultado}" alt="">
+                <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Resultado Final</h1>
+            </div>`;
+            // Temporario Merge
+            document.getElementById('resultado').innerHTML+=`  
+                <button onclick="downloadImagem('minhaImagem')" class="btn btn-primary m-3">Download</button>
+                `;
             
         },
         error: function (xhr,status,error) {
+            // Recebe o JSON resposta caso erro
             console.log('Erro ao processar imagem:', xhr.responseJSON);
-            document.getElementById('resultado').innerHTML = 'Erro ao processar imagem.';
+            document.getElementById('resultado').innerHTML = 'Erro ao processar imagem: <br>';
+            document.getElementById('resultado').innerHTML += `<div class='erro-msg text-danger'>${xhr.responseJSON.erro}</div>`; //pega o erro do objeto
         }
     });
-
-    /*var reader = new FileReader(); // Converte imagem para envio como json (mudar depois)
-    reader.onload = function (e) {
-        var dadosImagem = e.target.result.split(',')[1];
-
-        // Exibir mensagem de carregamento
-        document.getElementById('resultado').innerHTML = 'Processando imagem...';
-
-        // Enviar imagem para a API
-        $.ajax({
-            url: 'http://127.0.0.1:5000/color_gray',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ 'imagem': dadosImagem }),
-            success: function (data) {
-                document.getElementById('resultado').innerHTML = "<h1>Etapas de Processamento da imagem:</h1>"
-                // Exibir imagem original
-                document.getElementById('resultado').innerHTML +=` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_original}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem original</h1>
-                </div>`
-                // Exibir imagem processada (preto e branco)
-                document.getElementById('resultado').innerHTML += ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_pb}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem preto e branco</h1>
-                </div>`
-                
-            },
-            error: function (error) {
-                console.log('Erro ao processar imagem:', error);
-                document.getElementById('resultado').innerHTML = 'Erro ao processar imagem.';
-            }
-        });
-        
-    };
-
-    reader.readAsDataURL(inputImagem);*/
-    // Limpar o valor do campo de entrada de imagem
-    //inputImagem.value = null; // Use null para garantir a limpeza em diferentes navegadores
-});
- // Adicione um ouvinte de evento para o input de imagem
- document.getElementById('inputImagem-gray').addEventListener('change', function() {
-    var inputImagem = document.getElementById('inputImagem-gray');
-    var imagem = inputImagem.files[0];
-
-    var reader = new FileReader();
-    reader.onload = function (e) {
-        var dadosImagem = e.target.result.split(',')[1];
-
-        // Exibir mensagem de carregamento
-        document.getElementById('resultado').innerHTML = 'Processando imagem...';
-
-        // Enviar imagem para a API
-        $.ajax({
-            url: 'http://127.0.0.1:5000/color_gray',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ 'imagem': dadosImagem }),
-            success: function (data) {
-                document.getElementById('resultado').innerHTML = "<h1>Etapas de Processamento da imagem:</h1>"
-                // Exibir imagem original
-                document.getElementById('resultado').innerHTML +=` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_original}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem original</h1>
-                </div>`
-                // Exibir imagem processada (preto e branco)
-                document.getElementById('resultado').innerHTML += ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_pb}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem preto e branco</h1>
-                </div>`
-                
-            },
-            error: function (error) {
-                console.log('Erro ao processar imagem:', error);
-                document.getElementById('resultado').innerHTML = 'Erro ao processar imagem.';
-            }
-        });
-        
-    };
-
-    reader.readAsDataURL(imagem);
-    // Limpar o valor do campo de entrada de imagem
-    inputImagem.value = null; // Use null para garantir a limpeza em diferentes navegadores
 });
 
-document.getElementById('inputImagem-limiarizacao').addEventListener('change', function() {
-    var inputImagem = document.getElementById('inputImagem-limiarizacao');
-    var imagem = inputImagem.files[0];
+// OUTRAS FUNCOES
+function downloadImagem(id) {
 
-    var reader = new FileReader();
-    reader.onload = function (e) {
-        var dadosImagem = e.target.result.split(',')[1];
-       
-
-        // Exibir mensagem de carregamento
-        document.getElementById('resultado').innerHTML = 'Processando imagem...';
-
-        // Enviar imagem para a API
-        $.ajax({
-            url: 'http://127.0.0.1:5000/limiarizacao',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ 'imagem': dadosImagem }),
-            success: function (data) {
-                document.getElementById('resultado').innerHTML = "<h1>Etapas de Processamento da imagem:</h1>"
-                // Exibir imagem original
-                document.getElementById('resultado').innerHTML +=` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_original}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem original</h1>
-                </div>`
-                // Exibir imagem processada (preto e branco)
-                document.getElementById('resultado').innerHTML += ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_pb}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem preto e branco</h1>
-                </div>`
-                
-                // Exibir imagem limiarizada (preto e branco)
-                document.getElementById('resultado').innerHTML +=  ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_thresh}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem limiarizada</h1>
-                </div>`
-
-
-            },
-            error: function (error) {
-                console.log('Erro ao processar imagem:', error);
-                document.getElementById('resultado').innerHTML = 'Erro ao processar imagem.';
-            }
-        });
-        
-    };
-
-
+    // Selecionar a tag <img> pelo ID
+    var imgTag = document.getElementById(id);
     
+    // Criar um link <a> temp
+    var link = document.createElement('a');
     
-
-    reader.readAsDataURL(imagem);
-    // Limpar o valor do campo de entrada de imagem
-    inputImagem.value = null; // Use null para garantir a limpeza em diferentes navegadores
-});
-
-
-document.getElementById('inputImagem-sobel').addEventListener('change', function() {
-    var inputImagem = document.getElementById('inputImagem-sobel');
-    var imagem = inputImagem.files[0];
-
-    var reader = new FileReader();
-    reader.onload = function (e) {
-        var dadosImagem = e.target.result.split(',')[1];
-       
-
-        // Exibir mensagem de carregamento
-        document.getElementById('processamento').innerHTML = 'Processando imagem...';
-        document.getElementById('resultado').innerHTML = '';
-        // Enviar imagem para a API
-        $.ajax({
-            url: 'http://127.0.0.1:5000/sobel',
-            type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify({ 'imagem': dadosImagem }),
-            success: function (data) {
-                document.getElementById('processamento').innerHTML = "<h1>Etapas de Processamento da imagem:</h1>"
-                // Exibir imagem original
-                document.getElementById('processamento').innerHTML +=` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_original}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">imagem original</h1>
-                </div>`
-                // Exibir imagem processada (preto e branco)
-                document.getElementById('processamento').innerHTML += ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_sobel_x}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Sobel X</h1>
-                </div>`
-                
-                // Exibir imagem limiarizada (preto e branco)
-                document.getElementById('processamento').innerHTML +=  ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_sobel_y}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Sobel Y</h1>
-                </div>`
-
-                // Exibir imagem limiarizada (preto e branco)
-                document.getElementById('processamento').innerHTML +=  ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.imagem_soma_xy}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Sobel XY</h1>
-                </div>`
-
-                document.getElementById('resultado').innerHTML = "<h1>Resultado final:</h1>"
-
-                // Exibir imagem limiarizada (preto e branco)
-                document.getElementById('resultado').innerHTML +=  ` 
-                <div class="col text-center">          
-                    <img src="data:image/png;base64, ${data.resultado}" alt="">
-                    <h1 class="fs-2 p-2 bg-dark bg-opacity-50 text-info">Sobel XY</h1>
-                </div>`
-
-
-            },
-            error: function (error) {
-                console.log('Erro ao processar imagem:', error);
-                document.getElementById('processamento').innerHTML = 'Erro ao processar imagem.';
-            }
-        });
-        
-    };
-    reader.readAsDataURL(imagem);
-    // Limpar o valor do campo de entrada de imagem
-    inputImagem.value = null; // Use null para garantir a limpeza em diferentes navegadores
-
-});
+    // Configurar o link com o URL da imagem atual e o nome do arquivo desejado
+    link.href = imgTag.src;
+    link.download = 'bentrimagem.jpg';
+    
+    // Adicionar o link ao corpo do documento
+    document.body.appendChild(link);
+    
+    // Simular um clique no link para iniciar o download
+    link.click();
+    
+    // Remover o link do corpo do documento
+    document.body.removeChild(link);
+}

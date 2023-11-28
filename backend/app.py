@@ -11,15 +11,22 @@ import cv2
 import numpy as np
 import base64
 from matplotlib import pyplot as plt
+import io
 
+from werkzeug.utils import secure_filename
 import tempfile
 import os
 
 app = Flask(__name__)
 #CORS(app)# Adicione esta linha para habilitar CORS
+
+#Extensoes permitidas
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 #Essa constante guarda a pasta onde estarao as imagens temporariamente
 TEMP_FOLDER = os.path.join(app.root_path, 'temporarios')
 os.makedirs(TEMP_FOLDER, exist_ok=True)
+
+
 
 
 @app.route('/', methods=['GET'])
@@ -29,12 +36,21 @@ def index(name=None):
 @app.route('/processar', methods=['POST'])
 def processar():
     try:
-        #Obtem a imagem direto do request
+        # Aqui ele verifica se existe o campo no request object se nao BAD REQUEST
+        if 'inputImagem' not in request.files or 'inputFundo' not in request.files:
+            return jsonify({'erro': 'Ambos arquivos devem ser enviados!'}), 400
+
+        # Obtem a imagem e o fundo direto do request
         dados_imagem = request.files['inputImagem']
         dados_fundo = request.files['inputFundo']
 
-        #Obtem a operacao direto do request
-        op = request.form['op']
+        # Validacoes Necessarias Sobre o Tipo de Arquivo
+        if dados_imagem.filename == '' or dados_fundo.filename == '':
+            return jsonify({'erro': 'Ambos arquivos devem ser enviados!'}), 400
+
+        if not (allowed_file(dados_imagem.filename) and allowed_file(dados_fundo.filename)):
+            return jsonify({'erro': 'Tipo invalido de arquivo. Deve ser png, jpg, jpeg'}), 400
+
 
         #Caminho do arquivo temporario que representa a imagem e nao sera deletado quando fechado
         caminho = tempfile.NamedTemporaryFile(delete=False,dir=TEMP_FOLDER).name
@@ -47,79 +63,210 @@ def processar():
         #A imagem eh lida pelo cv
         imagem = cv2.imread(caminho)
 
-        # Faz o parse do OP para inteiro
-        try:
-            op = int(op)
-        except ValueError:
-            return jsonify({'error':'Erro de conversao de op'})
+        #Realiza o processamento
+        
+        img_gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
 
-        # Processar a imagem  de acordo com a OP, retorna apenas o resultado final
-        if op == 0:
-            imagem_pb = gray(imagem)
-        elif op == 1:
-            print("Iniciando a limiarizacao")
-            imagem_pb = limiarizacao(imagem)
-        elif op == 2:
-            print("Iniciando o Sobel")
-            imagem_pb = sobel(imagem)
-        else:
-            print("Nada foi selecionado entao gray")
-            imagem_pb = gray(imagem)
+        desfoque = cv2.GaussianBlur(img_gray,(7,7),0) #suavização
+        
+        canny = cv2.Canny(desfoque ,80,120)
+        canny = cv2.dilate(canny, np.ones((3,3),np.uint8),iterations=1)
+        
+        contornos, _ = cv2.findContours(canny, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        mascara = np.zeros((imagem.shape[0], imagem.shape[1]),dtype = np.uint8)
+        cv2.drawContours(mascara, contornos, -1, (255,255,255), thickness=cv2.FILLED)
+
+
+        mascara = cv2.dilate(mascara, np.ones((3,3),np.uint8),iterations=7)
+        mascara = cv2.erode(mascara,np.ones((3,3),np.uint8),iterations=7)
+
+        contornos, _ = cv2.findContours(mascara, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        mascara = np.zeros((imagem.shape[0], imagem.shape[1]),dtype = np.uint8)
+        cv2.drawContours(mascara, contornos, -1, (255,255,255), thickness=cv2.FILLED)
+        mask_canny = mascara.copy()
+
+        segundo = limiarizacao(imagem)
+        terceiro = sobelzinho(imagem)
+
+        soma = cv2.bitwise_or(mascara, cv2.bitwise_or(segundo, terceiro))
+        result = cv2.dilate(soma, np.ones((3,3),np.uint8),iterations=7)
+        result = cv2.erode(result, np.ones((3,3),np.uint8),iterations=7)
+        result = cv2.dilate(result, np.ones((3,3),np.uint8),iterations=5)
+        contornos, _ = cv2.findContours(result, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        mascara = np.zeros((imagem.shape[0], imagem.shape[1]),dtype = np.uint8)
+        
+        cv2.drawContours(mascara, contornos, -1, (255,255,255), thickness=cv2.FILLED)
+        mascara = cv2.erode(mascara, np.ones((3,3),np.uint8),iterations=5)
+
+        # Criar uma imagem com a máscara aplicada
+        sem_fundo = cv2.bitwise_and(imagem, imagem, mask=mascara)
+
+        # SUBSTITUICAO DE FUNDO
+
+        # Obter a imagem que quer substituir
+        fundo_novo = cv2.imread(caminho_fundo)
+
+         # Certificando-se de que as imagens têm o mesmo tamanho
+        fundo_novo = cv2.resize(fundo_novo, (sem_fundo.shape[1], sem_fundo.shape[0]))
+
+        # Criando uma máscara para o objeto segmentado
+        gray = cv2.cvtColor(sem_fundo, cv2.COLOR_BGR2GRAY)
+        _, mask = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
+
+        # Invertendo a máscara para obter o fundo
+        mask_inv = cv2.bitwise_not(mask)
+
+        # Substituindo o fundo preto pelo novo fundo
+        foreground = cv2.bitwise_and(sem_fundo, sem_fundo, mask=mask)
+        background = cv2.bitwise_and(fundo_novo, fundo_novo, mask=mask_inv)
+        result = cv2.add(foreground, background)
+
+        # TRANSFORMACAO EM JSON TEMPORARIA (mudar depois)
+
+        _, imagem_original_codificada = cv2.imencode('.png', imagem)
+        _, img_gray_codificada = cv2.imencode('.png', img_gray)  # Adicione o _
+        _, imagem_canny_codificada = cv2.imencode('.png', mask_canny)
+        _, img_thresh_codificada = cv2.imencode('.png', segundo)
+        _, img_sobel_codificada = cv2.imencode('.png', terceiro)
+        _, img_soma_codificada = cv2.imencode('.png', mascara)
+        _, img_semfundo_codificada = cv2.imencode('.png', sem_fundo)
+        _, resultado_image_png = cv2.imencode('.png', result)
         
 
-        #Por enquanto fazer retornar como JSON:
-        _, imagem_original_codificada = cv2.imencode('.png', imagem)
-        _, imagem_pb_codificada = cv2.imencode('.png', imagem_pb )  # Adicione o _
-
         imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
-        imagem_pb_base64 = base64.b64encode(imagem_pb_codificada).decode('utf-8')
+        img_gray_base64 = base64.b64encode(img_gray_codificada).decode('utf-8')
+        imagem_canny_base64 = base64.b64encode(imagem_canny_codificada).decode('utf-8')
+        imagem_thresh_base64 = base64.b64encode(img_thresh_codificada).decode('utf-8')
+        imagem_sobel_base64 = base64.b64encode(img_sobel_codificada).decode('utf-8')
+        imagem_soma_base64 = base64.b64encode(img_soma_codificada).decode('utf-8')
+        imagem_semfundo_base64 = base64.b64encode(img_semfundo_codificada).decode('utf-8')
+        resultado_image_png_64 = base64.b64encode(resultado_image_png).decode('utf-8')
 
-        # Deleta o caminho temporario e a imagem temporaria (por algum motivo comportamento estranho verificar depois)
+
+        # Deleta o caminho temporario e a imagem temporaria
         os.remove(caminho)
         os.remove(caminho_fundo)
 
-        # Retornar ambas as imagens processadas
+        # Retornar as imagens processadas em formato JSON
         return jsonify({
             'imagem_original': imagem_original_base64,
-            'imagem_pb': imagem_pb_base64
+            'imagem_gray': img_gray_base64,
+            'imagem_canny': imagem_canny_base64,
+            'imagem_limiarizacao': imagem_thresh_base64,
+            'imagem_sobel': imagem_sobel_base64,
+            'imagem_soma': imagem_soma_base64,
+            'imagem_semfundo': imagem_semfundo_base64,
+            'resultado': resultado_image_png_64
         })
 
     except Exception as e:
         return jsonify({'erro': str(e)}), 500
 
-def gray(imagem):
-    try:
-        # Obter a imagem a partir dos dados POST
-        #dados_imagem = request.json['imagem']
-        #imagem_decodificada = base64.b64decode(dados_imagem)
-        #imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
-        #imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
+# REALIZA OPERACAO SOBEL
+def sobelzinho(imagem):
+
+    img_gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+    #equ = cv2.equalizeHist(img_gray) #equalização
+    desfoque = cv2.GaussianBlur(img_gray,(7,7),2) #suavização
+    
+
+    # Segunda maneira
+    sobel_x = cv2.Sobel(desfoque, cv2.CV_64F, 1, 0, ksize = 1)
+    sobel_y = cv2.Sobel(desfoque, cv2.CV_64F, 0, 1, ksize = 1)
+
+
+    # Calcular a magnitude do gradiente
+    magnitude = np.sqrt(sobel_x**2 + sobel_y**2)
+
+    # Normalizar para valores entre 0 e 255 (opcional)
+    magnitude = cv2.normalize(magnitude, None, 0, 255, cv2.NORM_MINMAX)
+
+    # Converter para uint8
+    magnitude = np.uint8(magnitude)
+    
+    magnitude = cv2.dilate(magnitude, np.ones((3,3),np.uint8),iterations=2)
+    
+
+
+    # Calcular o limiar ótimo usando Otsu's Thresholding
+    _, binary_image = cv2.threshold(np.abs(magnitude), 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    # Encontrar contornos na imagem segmentada
+    contours, _ = cv2.findContours(binary_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # Criar uma máscara preta
+    mascara = np.zeros_like(img_gray)
+    # Filtrar contornos por área mínima, aspect ratio e área do contorno
+    min_contour_area = 20
+    max_aspect_ratio = 2000.0
+    min_contour_size = 20  # Ajuste conforme necessário
+
+    valid_contours = [
+        cnt for cnt in contours if (
+            cv2.contourArea(cnt) > min_contour_area and
+            (max_aspect_ratio >= (cv2.arcLength(cnt, True) ** 2) / (4 * np.pi * cv2.contourArea(cnt))) and
+            cv2.contourArea(cnt) > min_contour_size
+        )
+    ]
+
+
+
+    # Preencher a máscara com os contornos encontrados
+    cv2.drawContours(mascara, valid_contours, -1, (255), thickness=cv2.FILLED)
+    mascara = cv2.erode(mascara, np.ones((3,3),np.uint8),iterations=2) 
+    
+    return mascara
+
+# REALIZA OPERACAO DE LIMIARIZACAO
+def limiarizacao(imagem):
+
+    img_gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+    equ = cv2.equalizeHist(img_gray) #equalização
+    desfoque = cv2.GaussianBlur(equ,(7,7),0) #suavização
+    thresh = cv2.adaptiveThreshold(desfoque,255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 21, 3 ) # limiarização adaptativa Média (imagem, máximo, metodo de média,tipo de limiarização, tamanho da vizinhança de pixeis, constante subtraida da média )
+    #thresh = cv2.adaptiveThreshold(desfoque,255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 3 ) # limiarização adaptativa gaussiana(imagem, máximo, metodo de gaussiana,tipo de limiarização, tamanho da vizinhança de pixeis, constante subtraida da média )
+    
 
 
 
 
+    thresh = cv2.erode(thresh,np.ones((3,3),np.uint8),iterations=2)
+    
 
-        # Processar a imagem (converter para preto e branco)
-        imagemR = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
 
-        # Codificar ambas as imagens para base64
-        #_, imagem_original_codificada = cv2.imencode('.png', imagem)
-        #_, imagem_pb_codificada = cv2.imencode('.png', imagem_pb )  # Adicione o _
 
-        #imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
-        #imagem_pb_base64 = base64.b64encode(imagem_pb_codificada).decode('utf-8')
+    # Encontrar contornos na imagem segmentada
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-        # Retornar ambas as imagens processadas
-        #return jsonify({
-        #    'imagem_original': imagem_original_base64,
-        #    'imagem_pb': imagem_pb_base64
-        #})
-        return imagemR
-    except Exception as e:
-        #return jsonify({'erro': str(e)}), 500
-        print("Erro na Grayscalizacao: " + str(e))
-        return imagem
+    # Criar uma máscara preta
+    mascara = np.zeros_like(img_gray)
+    # Filtrar contornos por área mínima, aspect ratio e área do contorno
+    min_contour_area = 1200
+    max_aspect_ratio = 1000.0
+    min_contour_size = 150  # Ajuste conforme necessário
 
+    valid_contours = [
+        cnt for cnt in contours if (
+            cv2.contourArea(cnt) > min_contour_area and
+            (max_aspect_ratio >= (cv2.arcLength(cnt, True) ** 2) / (4 * np.pi * cv2.contourArea(cnt))) and
+            cv2.contourArea(cnt) > min_contour_size
+        )
+    ]
+
+
+
+    # Preencher a máscara com os contornos encontrados
+    cv2.drawContours(mascara, valid_contours, -1, (255), thickness=cv2.FILLED)
+    
+    return mascara
+
+# FUNCOES AUXILIARES
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def convert_to_grayscale(image):
+    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return gray_image
 
 def downscale_image(image, scale_factor):
     """
@@ -151,212 +298,7 @@ def preencher_vizinhanca(imagem, tamanho_vizinhanca):
     return imagem_conectada
 
 
-def limiarizacao(imagem):
-    try:
-        # Obter a imagem a partir dos dados POST ----- ja veio direto do outro
-        #dados_imagem = request.json['imagem']
-        #imagem_decodificada = base64.b64decode(dados_imagem)
-        #imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
-        #imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
-        
-        # Reduzir a qualidade para acelerar o processamento
-        imagemT = downscale_image(imagem, scale_factor=0.4)
-
-
-
-
-        # Processar a imagem (converter para preto e branco)
-        img_gray = cv2.cvtColor(imagemT, cv2.COLOR_BGR2GRAY)
-
-        desfoque = cv2.GaussianBlur(img_gray,(7,7),0) #suavização
-        equ = cv2.equalizeHist(desfoque) #equalização
-        #plt.subplot(131), plt.imshow(desfoque, cmap='gray'), plt.title('tom cinza')
-        #plt.subplot(132), plt.imshow(equ, cmap='gray'), plt.title('tom cinza')
-        #plt.show()
-        
-        # esse _, é por que retorna o valor do limiar e como não irá usar o tracinho serve pra não guardar em nenhum lugar
-        #_, thresh = cv2.threshold(desfoque,130,255, cv2.THRESH_BINARY_INV) # limiarização normal (imagem, limiar, maximo, tipo de algoritimo)
-        #_, thresh = cv2.threshold(equ,0,255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU ) # limiarização otsu (imagem, minimo, maximo, tipo de algoritimo, metodo de otsu)
-        #thresh = cv2.adaptiveThreshold(desfoque,255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 11, 9 ) # limiarização adaptativa Média (imagem, máximo, metodo de média,tipo de limiarização, tamanho da vizinhança de pixeis, constante subtraida da média )
-        thresh = cv2.adaptiveThreshold(equ,255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 15, 5 ) # limiarização adaptativa gaussiana(imagem, máximo, metodo de gaussiana,tipo de limiarização, tamanho da vizinhança de pixeis, constante subtraida da média )
-        kernel = np.ones((3,3), np.uint8) #kernel
-        erosao = cv2.erode(thresh, kernel) #erosão
-        dilatacao = cv2.dilate(erosao,kernel, iterations=7) #dilatação
-        thresh = dilatacao
-
-
-        #elementos = dilatacao.copy()
-        #contornos, hierarquia = cv2.findContours(elementos, cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-        #imagem = imagem.copy()
-       # for cnt in contornos:
-           # area = cv2.contourArea(cnt)
-          #  if area >= 100:
-         #       elipse = cv2.fitEllipse(cnt)
-        #        cv2.ellipse(imagem, elipse, (0,255,0),3)
-       # thresh = imagem.copy()
-        # Codificar ambas as imagens para base64
-
-
-
-
-        # Crie uma máscara onde as bordas são brancas
-        #_, mascara = cv2.threshold(thresh, 240, 255, cv2.THRESH_BINARY)
-
-        #imagem_segmentada = cv2.bitwise_and(imagem, imagem, mask=mascara)
-
-                
-        #thresh = imagem_segmentada
-
-
-
-
-
-
-        # Encontrar contornos na imagem segmentada
-        contours, _ = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-
-        # Criar uma máscara preta
-        mascara = np.zeros_like(img_gray)
-        # Filtrar contornos por área mínima, aspect ratio e área do contorno
-        min_contour_area = 40
-        max_aspect_ratio = 300.0
-        min_contour_size = 10000  # Ajuste conforme necessário
-
-        valid_contours = [
-            cnt for cnt in contours if (
-                cv2.contourArea(cnt) > min_contour_area and
-                (max_aspect_ratio >= (cv2.arcLength(cnt, True) ** 2) / (4 * np.pi * cv2.contourArea(cnt))) and
-                cv2.contourArea(cnt) > min_contour_size
-            )
-        ]
-        
-        # Preencher a máscara com os contornos encontrados
-        cv2.drawContours(mascara, valid_contours, -1, (255), thickness=cv2.FILLED)
-        
-        
- 
-        # Aplicar a máscara na imagem original (alterei para imagemT depois revisar porfavor)
-        result = cv2.bitwise_and(imagemT, imagemT, mask=mascara)
-        #aumentando a qualidade novamente da imagem
-        result = upscale_image(result, scale_factor=0.2)
-        
-        
-        # Converta a imagem resultante para base64  ------ nao eh mais necessario
-        #_, result_codificada = cv2.imencode('.png', result)
-        #resultado_base64 = base64.b64encode(result_codificada).decode('utf-8')
-
-        #_, imagem_original_codificada = cv2.imencode('.png', imagem)
-        #_, img_gray_codificada = cv2.imencode('.png', mascara)  # Adicione o _
-        #_, imagem_thresh_codificada = cv2.imencode('.png', thresh)
-
-        #imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
-        #img_gray_base64 = base64.b64encode(img_gray_codificada).decode('utf-8')
-        #imagem_thresh_base64 = base64.b64encode(imagem_thresh_codificada).decode('utf-8')
-
-        # Retornar ambas as imagens processadas
-        #return jsonify({
-        #    'imagem_original': imagem_original_base64,
-        #    'imagem_pb': img_gray_base64,
-        #    'imagem_thresh': resultado_base64
-        #})
-        return result
-
-    except Exception as e:
-        #return jsonify({'erro': str(e)}), 500
-        print("Erro na Limiarizacao: " + str(e))
-        return imagem
-    
-
-def sobel(imagem):
-    try:
-        # Obter a imagem a partir dos dados POST
-        #dados_imagem = request.json['imagem']
-        #imagem_decodificada = base64.b64decode(dados_imagem)
-        #imagem_np = np.frombuffer(imagem_decodificada, dtype=np.uint8)
-        #imagem = cv2.imdecode(imagem_np, cv2.IMREAD_COLOR)
-
-
-        img_gray = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
-
-        desfoque = cv2.GaussianBlur(img_gray,(7,7),0) #suavização
-        equ = cv2.equalizeHist(desfoque) #equalização
-
-        
-        sobel_x = cv2.Sobel(equ, cv2.CV_64F, 1,0, ksize = 3)
-        sobel_y = cv2.Sobel(equ, cv2.CV_64F, 0,1, ksize = 3)
-
-        sobel_x = cv2.convertScaleAbs(sobel_x)
-        sobel_y = cv2.convertScaleAbs(sobel_y)
-
-        sobel = cv2.addWeighted(src1 = sobel_x, alpha=5, src2 = sobel_y, beta = 5, gamma = 0)
-
-        
-
-
-
-
-
-
-
-      
-        # Encontrar contornos na imagem segmentada
-        contours, _ = cv2.findContours(sobel, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-
-        # Criar uma máscara preta
-        mascara = np.zeros_like(img_gray)
-        # Filtrar contornos por área mínima, aspect ratio e área do contorno
-        min_contour_area = 870000
-        max_aspect_ratio = 6.0
-        min_contour_size = 10000  # Ajuste conforme necessário
-
-        valid_contours = [
-            cnt for cnt in contours if (
-                cv2.contourArea(cnt) > min_contour_area and
-                (max_aspect_ratio >= (cv2.arcLength(cnt, True) ** 2) / (4 * np.pi * cv2.contourArea(cnt))) and
-                cv2.contourArea(cnt) > min_contour_size
-            )
-        ]
-
-        # Preencher a máscara com os contornos encontrados
-        cv2.drawContours(mascara, valid_contours, -1, (255), thickness=cv2.FILLED)
- 
-        # Aplicar a máscara na imagem original
-        result = cv2.bitwise_and(imagem, imagem, mask=mascara)
-
-        # Converta a imagem resultante para base64 -------- nao eh mais necessario
-        #_, result_codificada = cv2.imencode('.png', result)
-        #resultado_base64 = base64.b64encode(result_codificada).decode('utf-8')
-
-        #_, imagem_original_codificada = cv2.imencode('.png', mascara)
-        #_, img_gray_codificada = cv2.imencode('.png', sobel_x)  # Adicione o _
-        #_, imagem_thresh_codificada = cv2.imencode('.png', sobel_y)
-        #_, img_sobelx_codificada = cv2.imencode('.png', sobel_x)
-        #_, img_sobely_codificada = cv2.imencode('.png', sobel_y)
-        #_, img_sobelxy_codificada = cv2.imencode('.png', sobel)
-        #_, img_resultado_codificada = cv2.imencode('.png', sobel_y)
-
-        #imagem_original_base64 = base64.b64encode(imagem_original_codificada).decode('utf-8')
-        #img_gray_base64 = base64.b64encode(img_gray_codificada).decode('utf-8')
-        #imagem_thresh_base64 = base64.b64encode(imagem_thresh_codificada).decode('utf-8')
-        #imagem_sobelx_base64 = base64.b64encode(img_sobelx_codificada).decode('utf-8')
-        #imagem_sobely_base64 = base64.b64encode(img_sobely_codificada).decode('utf-8')
-        #imagem_sobelxy_base64 = base64.b64encode(img_sobelxy_codificada).decode('utf-8')
-        #imagem_resultado_base64 = base64.b64encode(img_resultado_codificada).decode('utf-8')
-
-        # Retornar ambas as imagens processadas
-        #return jsonify({
-        #    'imagem_original': imagem_original_base64,
-        #    'imagem_sobel_x': imagem_sobelx_base64,
-        #    'imagem_sobel_y': imagem_sobely_base64,
-        #    'imagem_soma_xy': imagem_sobelxy_base64,
-        #    'resultado': resultado_base64
-        #})
-        return result
-
-    except Exception as e:
-        #return jsonify({'erro': str(e)}), 500 
-        print("Erro na Sobelizacao: " + str(e))   
-        return imagem
+# MAIN
 
 if __name__ == '__main__':
     app.run(debug=True)
