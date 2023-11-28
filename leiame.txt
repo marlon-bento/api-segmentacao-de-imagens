@@ -1,0 +1,24 @@
+<h2>Substituidor de Fundos API</h2>
+
+Usa técnicas de processamento de imagens para substituir o fundo de uma imagem simples de animais, plantas ou objetos, 
+com objetivo de a utilizar em obras de artes ou propósitos educacionais.
+
+Conteúdo:
+
+  -Técnicas de Processamento: Sobel, Limiarização, ...
+  -Backend da API em Python Flask
+  -UI em Bootstrap 5
+  -Javascript com JQuery para o resto
+
+
+Como Executar:
+
+  -Obter bibliotecas pelo PIP rodando no cmd ou shell: pip install opencv-python numpy matplotlib flask flask-cors scipy
+  -Entrar na pasta ./backend e abrir terminal, rodando "flask run"
+  -Acessar o endereço fornecido pelo Flask
+  -OU rodar o bash executavel
+
+
+Grupo: Márlon Bento e Gabriel Braz
+
+LINK PARA O REPOSITÓRIO: https://github.com/marlon-bento/api-segmentacao-de-imagens
