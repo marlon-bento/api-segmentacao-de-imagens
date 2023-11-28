@@ -64,15 +64,22 @@
             </div>
         </div>
     </header>
-
+    <div class="lead text-center fs-3">
+        Escolha duas imagens, uma será usada para substituir o fundo da outra, só aceitamos formatos jpg, jpeg e png.
+    </div>
     <div class="form-enviar">
         <div class="d-flex flex-column align-items-center justify-content-center ">
             <h1>Vamos processar a sua imagem!</h1>
-            <form action="#" id="theForm">
-                <label for="inputImagem">Imagem: </label>
-                <input class="mx-2" type="file" name="inputImagem" id="inputImagem" accept="image/*" /> <br>
-                <label for="inputImagem">Fundo: </label>
-                <input class="mx-2" type="file" name="inputFundo" id="inputFundo" accept="image/*" /> <br>
+            <form class="d-flex flex-column align-items-center" action="#" id="theForm">
+                <div class="input-group mb-3">
+                    <label class="input-group-text" for="inputImagem">Imagem: </label>
+                    <input class="form-control" type="file" name="inputImagem" id="inputImagem" accept="image/*" /> <br>
+                   
+                </div>
+                <div class="input-group mb-3">
+                    <label class="input-group-text" for="inputImagem">Fundo: </label>
+                    <input class="form-control" type="file" name="inputFundo" id="inputFundo" accept="image/*" /> <br>
+                </div>
                 <!--<select name="op" id="inputOp">
                     <option value="0">Escala Cinza</option>
                     <option value="1">Limiarização</option>
@@ -82,7 +89,7 @@
             </form>
         </div>
     </div>
-    <div class="control-btns row mt-3 mx-2 justify-content-right">
+    <div class="control-btns d-flex mt-3 mx-2 justify-content-center">
         <button onclick="mostrarEtapas()" id="botaoMostrar" class="btn btn-secondary">Mostrar Etapas</button>
     </div>
     <div class="row d-none mt-3 mx-2 justify-content-center" id="processamento">

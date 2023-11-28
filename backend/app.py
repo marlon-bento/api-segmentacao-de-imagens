@@ -268,23 +268,6 @@ def convert_to_grayscale(image):
     gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     return gray_image
 
-def downscale_image(image, scale_factor):
-    """
-    Reduz a qualidade da imagem pelo fator de escala.
-    """
-    height, width = image.shape[:2]
-    new_size = (int(width * scale_factor), int(height * scale_factor))
-    return cv2.resize(image, new_size, interpolation=cv2.INTER_LINEAR)
-
-def upscale_image(image, scale_factor):
-    """
-    Aumenta a qualidade da imagem de volta ao tamanho original.
-    """
-    height, width = image.shape[:2]
-    new_size = (int(width / scale_factor), int(height / scale_factor))
-    return cv2.resize(image, new_size, interpolation=cv2.INTER_LINEAR)
-
-
 def preencher_vizinhanca(imagem, tamanho_vizinhanca):
     # Encontrar contornos na imagem
     contornos, _ = cv2.findContours(imagem, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
