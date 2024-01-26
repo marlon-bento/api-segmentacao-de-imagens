@@ -8,7 +8,7 @@ echo "Se nao existir, altere os SET abaixo no .bat:"
 REM Altere abaixo com o caminho absoluto do php.exe
 set CAMINHO_PYTHON=pip
 
-where /q php
+where /q pip
 IF %ERRORLEVEL% NEQ 0 (
 	echo "PIP nao foi encontrado, instale o Python PIP e altere o batch ou"
 	echo "adicione o caminho ao PIP no PATH do sistema"
