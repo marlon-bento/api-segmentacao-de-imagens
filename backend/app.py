@@ -1,5 +1,6 @@
 #no cmd instalar
-# pip install opencv-python numpy matplotlib flask flask-cors 
+# pip install opencv-python numpy matplotlib flask flask-cors scipy 
+# pipenv install opencv-python numpy matplotlib flask flask-cors scipy 
 # pip install scipy
 
 
